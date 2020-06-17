@@ -45,9 +45,16 @@ if(NOT DEFINED OPENSSL_LIBRARIES
 
   #------------------------------------------------------------------------------
   if(UNIX)
+    # Starting with Qt 5.12.4, official Qt binaries are build against OpenSSL 1.1.1
+    # See https://www.qt.io/blog/2019/06/17/qt-5-12-4-released-support-openssl-1-1-1
+    if("${Qt5_VERSION_MAJOR}.${Qt5_VERSION_MINOR}.${Qt5_VERSION_PATCH}" VERSION_GREATER_EQUAL "5.12.4")
+      set(_default_version "1.1.1g")
+    else()
+      set(_default_version "1.0.2n")
+    endif()
 
-    set(OPENSSL_DOWNLOAD_VERSION "1.0.2n" CACHE STRING "Version of OpenSSL source package to download")
-    set_property(CACHE OPENSSL_DOWNLOAD_VERSION PROPERTY STRINGS "1.0.1e" "1.0.1l" "1.0.2n")
+    set(OPENSSL_DOWNLOAD_VERSION "${_default_version}" CACHE STRING "Version of OpenSSL source package to download")
+    set_property(CACHE OPENSSL_DOWNLOAD_VERSION PROPERTY STRINGS "1.0.1e" "1.0.1l" "1.0.2n" "1.1.1g")
 
     set(OpenSSL_1.0.1e_URL https://github.com/Slicer/Slicer-OpenSSL/releases/download/sources/openssl-1.0.1e.tar.gz)
     set(OpenSSL_1.0.1e_MD5 66bf6f10f060d561929de96f9dfe5b8c)
@@ -57,6 +64,10 @@ if(NOT DEFINED OPENSSL_LIBRARIES
 
     set(OpenSSL_1.0.2n_URL https://github.com/Slicer/Slicer-OpenSSL/releases/download/sources/openssl-1.0.2n.tar.gz)
     set(OpenSSL_1.0.2n_MD5 13bdc1b1d1ff39b6fd42a255e74676a4)
+
+    set(OpenSSL_1.1.1g_URL https://github.com/Slicer/Slicer-OpenSSL/releases/download/sources/openssl-1.1.1g.tar.gz)
+    set(OpenSSL_1.1.1g_MD5 76766e98997660138cdaf13a187bd234)
+
 
     if(NOT DEFINED OpenSSL_${OPENSSL_DOWNLOAD_VERSION}_URL)
       message(FATAL_ERROR "There is no source version of OpenSSL ${OPENSSL_DOWNLOAD_VERSION} available.
@@ -159,7 +170,7 @@ ExternalProject_Execute(${proj} \"build\" make -j1 build_libs)
       ExternalProject_Add_Step(${proj} fix_rpath
         COMMAND install_name_tool -id ${EP_SOURCE_DIR}/libcrypto.dylib ${EP_SOURCE_DIR}/libcrypto.dylib
         COMMAND install_name_tool
-          -change /usr/local/ssl/lib/libcrypto.1.0.0.dylib ${EP_SOURCE_DIR}/libcrypto.dylib
+          -change /usr/local/ssl/lib/libcrypto.1.1.1.dylib ${EP_SOURCE_DIR}/libcrypto.dylib
           -id ${EP_SOURCE_DIR}/libssl.dylib ${EP_SOURCE_DIR}/libssl.dylib
         DEPENDEES build
         )
@@ -179,10 +190,15 @@ ExternalProject_Execute(${proj} \"build\" make -j1 build_libs)
   #------------------------------------------------------------------------------
   elseif(WIN32)
 
-    set(OPENSSL_DOWNLOAD_VERSION "1.0.1h" CACHE STRING "Version of OpenSSL pre-compiled package to download.")
-    set_property(CACHE OPENSSL_DOWNLOAD_VERSION PROPERTY STRINGS "1.0.1h" "1.0.1l")
-
-    set(_qt_version "${QT_VERSION_MAJOR}.${QT_VERSION_MINOR}.${QT_VERSION_PATCH}")
+    # Starting with Qt 5.12.4, official Qt binaries are build against OpenSSL 1.1.1
+    # See https://www.qt.io/blog/2019/06/17/qt-5-12-4-released-support-openssl-1-1-1
+    if("${Qt5_VERSION_MAJOR}.${Qt5_VERSION_MINOR}.${Qt5_VERSION_PATCH}" VERSION_GREATER_EQUAL "5.12.4")
+      set(_default_version "1.1.1g")
+    else()
+      set(_default_version "1.0.1h")
+    endif()
+    set(OPENSSL_DOWNLOAD_VERSION "${_default_version}" CACHE STRING "Version of OpenSSL pre-compiled package to download.")
+    set_property(CACHE OPENSSL_DOWNLOAD_VERSION PROPERTY STRINGS "1.0.1h" "1.0.1l" "1.1.1g")
 
     # Starting with Qt 4.8.6, we compiled [1] OpenSSL binaries specifically for each
     # version of Microsoft Visual Studio. To understand the motivation, read below.
@@ -246,6 +262,13 @@ this version of visual studio [${MSVC_VERSION}]. You could either:
 
     #--------------------
     elseif(CMAKE_SIZEOF_VOID_P EQUAL 8) # 64-bit
+
+      # OpenSSL 1.1.1g
+      # VS2015, VS2017 and VS2019
+      if(${MSVC_VERSION} VERSION_GREATER_EQUAL 1900)
+        set(OpenSSL_1.1.1g_${MSVC_VERSION}_URL https://github.com/Slicer/Slicer-OpenSSL/releases/download/1.1.1g/OpenSSL_1_1_1g-install-msvc1900-64.tar.gz)
+        set(OpenSSL_1.1.1g_${MSVC_VERSION}_MD5 f89ea6a4fcfb279af30cbe01c1d7f879)
+      endif()
 
       # OpenSSL 1.0.1h
       # VS2008
@@ -318,10 +341,17 @@ this version of visual studio [${MSVC_VERSION}]. You could either:
     set(OPENSSL_LIBRARY_DIR "${OpenSSL_DIR}/lib")
     set(OPENSSL_EXPORT_LIBRARY_DIR "${OpenSSL_DIR}/bin")
 
-    set(LIB_EAY_DEBUG "${EP_SOURCE_DIR}/Debug/lib/libeay32.lib")
-    set(LIB_EAY_RELEASE "${EP_SOURCE_DIR}/Release/lib/libeay32.lib")
-    set(SSL_EAY_DEBUG "${EP_SOURCE_DIR}/Debug/lib/ssleay32.lib")
-    set(SSL_EAY_RELEASE "${EP_SOURCE_DIR}/Release/lib/ssleay32.lib")
+    if(OPENSSL_DOWNLOAD_VERSION VERSION_GREATER_EQUAL "1.1.0")
+      set(LIB_EAY_DEBUG "${EP_SOURCE_DIR}/Debug/lib/libcrypto.lib")
+      set(LIB_EAY_RELEASE "${EP_SOURCE_DIR}/Release/lib/libcrypto.lib")
+      set(SSL_EAY_DEBUG "${EP_SOURCE_DIR}/Debug/lib/libssl.lib")
+      set(SSL_EAY_RELEASE "${EP_SOURCE_DIR}/Release/lib/libssl.lib")
+    else()
+      set(LIB_EAY_DEBUG "${EP_SOURCE_DIR}/Debug/lib/libeay32.lib")
+      set(LIB_EAY_RELEASE "${EP_SOURCE_DIR}/Release/lib/libeay32.lib")
+      set(SSL_EAY_DEBUG "${EP_SOURCE_DIR}/Debug/lib/ssleay32.lib")
+      set(SSL_EAY_RELEASE "${EP_SOURCE_DIR}/Release/lib/ssleay32.lib")
+    endif()
 
     ExternalProject_Message(${proj} "LIB_EAY_DEBUG:${LIB_EAY_DEBUG}")
     ExternalProject_Message(${proj} "LIB_EAY_RELEASE:${LIB_EAY_RELEASE}")
